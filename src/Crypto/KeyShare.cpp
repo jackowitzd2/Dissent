@@ -1,6 +1,7 @@
 #include <QDebug>
 #include <QDir>
 #include <QFile>
+#include <QSslKey>
 
 #include "KeyShare.hpp"
 #include "DsaPublicKey.hpp"
@@ -20,18 +21,51 @@ namespace Crypto {
   {
     if(_keys.contains(name)) {
       return _keys[name];
+    } else if(_certs.contains(name)) {
+        QSharedPointer<QSslCertificate> cert = _certs[name];
+        QSslKey pubkey = cert->publicKey();
+        QSharedPointer<AsymmetricKey> key(new DsaPublicKey(pubkey.toDer()));
+        KeyShare *ks = const_cast<KeyShare *>(this);
+        ks->_keys[name] = key;
+        return key;
     } else if(_fs_enabled) {
       QString key_path = _path + "/" + name + ".pub";
       QFile key_file(key_path);
       if(key_file.exists()) {
-        QSharedPointer<AsymmetricKey> key(new DsaPublicKey(key_path));
+        key_file.open(QIODevice::ReadOnly);
+        QSharedPointer<QSslCertificate> cert(new QSslCertificate(&key_file, QSsl::Der));
+        QSslKey pubkey = cert->publicKey();
+        QSharedPointer<AsymmetricKey> key(new DsaPublicKey(pubkey.toDer()));
         KeyShare *ks = const_cast<KeyShare *>(this);
+        ks->_certs[name] = cert;
         ks->_keys[name] = key;
         return key;
       }
     }
 
     return QSharedPointer<AsymmetricKey>();
+  }
+
+  QSharedPointer<QSslCertificate> KeyShare::GetCertificate(const QString &name) const
+  {
+    if(_certs.contains(name)) {
+        return _certs[name];
+    } else if(_fs_enabled) {
+      QString key_path = _path + "/" + name + ".pub";
+      QFile key_file(key_path);
+      if(key_file.exists()) {
+        key_file.open(QIODevice::ReadOnly);
+        QSharedPointer<QSslCertificate> cert(new QSslCertificate(&key_file, QSsl::Der));
+        QSslKey pubkey = cert->publicKey();
+        QSharedPointer<AsymmetricKey> key(new DsaPublicKey(pubkey.toDer()));
+        KeyShare *ks = const_cast<KeyShare *>(this);
+        ks->_certs[name] = cert;
+        ks->_keys[name] = key;
+        return cert;
+      }
+    }
+
+    return QSharedPointer<QSslCertificate>();
   }
 
   void KeyShare::AddKey(const QString &name, QSharedPointer<AsymmetricKey> key)
@@ -47,6 +81,14 @@ namespace Crypto {
     }
     iterator.insert(name);
   }
+
+  void KeyShare::AddCertificate(const QString &name, QSharedPointer<QSslCertificate> cert)
+  {
+    _certs[name] = cert;
+    QSslKey pubkey = cert->publicKey();
+    QSharedPointer<AsymmetricKey> key(new DsaPublicKey(pubkey.toDer()));
+    AddKey(name, key);
+  } 
 
   bool KeyShare::Contains(const QString &name) const
   {
@@ -66,14 +108,18 @@ namespace Crypto {
     QDir key_path(_path, "*.pub");
     foreach(const QString &key_name, key_path.entryList()) {
       QString path = _path + "/" + key_name;
-      QSharedPointer<AsymmetricKey> key(new DsaPublicKey(path));
+      QFile key_file(path);
+      key_file.open(QIODevice::ReadOnly);
+      QSharedPointer<QSslCertificate> cert(new QSslCertificate(&key_file, QSsl::Der));
+      QSslKey pubkey = cert->publicKey();
+      QSharedPointer<AsymmetricKey> key(new DsaPublicKey(pubkey.toDer()));
       if(!key->IsValid()) {
         qDebug() << "Invalid key:" << path;
         continue;
       }
 
       QString name = key_name.left(key_name.length() - 4);
-      AddKey(name, key);
+      AddCertificate(name, cert);
     }
   }
 }

@@ -4,6 +4,7 @@
 #include <QHash>
 #include <QLinkedList>
 #include <QSharedPointer>
+#include <QSslCertificate>
 
 #include "AsymmetricKey.hpp"
 
@@ -34,12 +35,26 @@ namespace Crypto {
       QSharedPointer<AsymmetricKey> GetKey(const QString &name) const;
 
       /**
+       * Returns the certificate for the key under the given name or
+       * an empty certificate if no such certificate exists.
+       */
+      QSharedPointer<QSslCertificate> GetCertificate(const QString &name) const;
+
+      /**
        * Add a key to the share
        * @param name the name of the key
        * @param key the AsymmetricKey key
        * @todo should save to disk if _fs_enabled is true
        */
       void AddKey(const QString &name, QSharedPointer<AsymmetricKey> key);
+
+      /**
+       * Add a certificate (and its public key) to the share
+       * @param name the name of the certificate
+       * @param cert the QSslCertificate certificate
+       * @todo should save to disk if _fs_enabled is true
+       */
+      void AddCertificate(const QString &name, QSharedPointer<QSslCertificate> cert);
 
       /**
        * Returns true of the named key exists
@@ -115,6 +130,7 @@ namespace Crypto {
 
       QLinkedList<QString> _sorted_keys;
       QHash<QString, QSharedPointer<AsymmetricKey> > _keys;
+      QHash<QString, QSharedPointer<QSslCertificate> > _certs;
   };
 }
 }
