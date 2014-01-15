@@ -119,7 +119,7 @@ namespace Applications {
 
     if(_settings->contains(Param<Params::PrivateKey>())) {
       QVariant vkeys = _settings->value(Param<Params::PrivateKey>());
-      if(QMetaType::QVariantList == static_cast<QMetaType::Type>(vkeys.type())) {
+      if(QMetaType::QStringList == static_cast<QMetaType::Type>(vkeys.type())) {
         QVariantList keys = vkeys.toList();
         foreach(const QVariant &key, keys) {
           PrivateKey.append(key.toString());
